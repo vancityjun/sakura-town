@@ -1,0 +1,128 @@
+newmtl aiStandardSurface10SG
+illum 4
+Kd 0.00 0.00 0.00
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 0.00
+newmtl aiStandardSurface20SG
+illum 4
+Kd 0.00 0.00 0.00
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 0.00
+newmtl aiStandardSurface22SG
+illum 4
+Kd 0.00 0.00 0.00
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 0.00
+newmtl blinn1SG
+illum 4
+Kd 0.57 0.49 1.00
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 1.00
+Ks 1.00 1.00 1.00
+newmtl chracter2_lambert3SG
+illum 4
+Kd 1.00 0.93 0.90
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 1.00
+newmtl chracter2_lambert4SG
+illum 4
+Kd 0.13 0.02 0.00
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 1.00
+newmtl flowerpattern2SG
+illum 4
+Kd 1.00 0.94 0.65
+Ka 1.00 0.54 0.05
+Tf 1.00 1.00 1.00
+map_Kd 615.jpg
+Ni 1.00
+newmtl flowerpattern3SG
+illum 4
+Kd 1.00 0.64 0.85
+Ka 1.00 0.54 0.75
+Tf 1.00 1.00 1.00
+map_Kd 615.jpg
+Ni 1.00
+newmtl flowerpattern4SG
+illum 4
+Kd 0.74 1.00 0.88
+Ka 0.54 1.00 0.68
+Tf 1.00 1.00 1.00
+map_Kd 615.jpg
+Ni 1.00
+newmtl flowerpattern5SG
+illum 4
+Kd 1.00 0.33 0.20
+Ka 1.00 0.03 0.00
+Tf 1.00 1.00 1.00
+map_Kd 615.jpg
+Ni 1.00
+newmtl flowerpattern6SG
+illum 4
+Kd 0.88 0.44 0.50
+Ka 0.48 0.04 0.10
+Tf 1.00 1.00 1.00
+map_Kd 615.jpg
+Ni 1.00
+newmtl lambert4SG
+illum 4
+Kd 0.96 0.43 0.65
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 1.00
+newmtl lambert6SG
+illum 4
+Kd 1.00 1.00 1.00
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 1.00
+newmtl lambert8SG
+illum 4
+Kd 0.24 0.24 0.24
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 1.00
+newmtl lambert14SG
+illum 4
+Kd 0.93 0.49 0.06
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 1.00
+newmtl lambert15SG
+illum 4
+Kd 1.00 0.93 0.90
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+map_Kd shiba-face-02.png
+Ni 1.00
+newmtl lambert16SG
+illum 4
+Kd 0.57 0.74 1.00
+Ka 0.37 0.54 0.82
+Tf 1.00 1.00 1.00
+map_Kd 615.jpg
+Ni 1.00
+newmtl lambert17SG
+illum 4
+Kd 0.11 0.54 0.05
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 1.00
+newmtl lambert18SG
+illum 4
+Kd 0.53 0.04 0.00
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 1.00
+newmtl torri_initialShadingGroup
+illum 4
+Kd 0.04 0.04 0.03
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 1.00
