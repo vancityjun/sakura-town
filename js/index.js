@@ -113,6 +113,9 @@ function init() {
     objloader.load( 'models/sakura-park.obj', function ( obj ) {
       object = obj;
       obj.castShadow = true;
+      obj.traverse(function(child){
+        child.cashShadow = true;
+      })
       // control.attach( obj );
       // scene.add( control );
     }, onProgress, onError );
