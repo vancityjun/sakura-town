@@ -114,7 +114,7 @@ function init() {
       object = obj;
       obj.castShadow = true;
       obj.traverse(function(child){
-        child.cashShadow = true;
+        child.castShadow = true;
       })
       // control.attach( obj );
       // scene.add( control );
