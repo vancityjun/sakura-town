@@ -105,9 +105,11 @@ function init() {
   // mtlLoader.setBaseUrl('models/');
   mtlLoader.load('models/sakura-park.mtl', function(materials){
     materials.preload();
+
     var objloader = new THREE.OBJLoader( manager );
     objloader.setMaterials(materials);
     // objloader.setPath('models/');
+
     objloader.load( 'models/sakura-park.obj', function ( obj ) {
       object = obj;
       // control.attach( obj );
@@ -121,6 +123,8 @@ function init() {
   renderer.setPixelRatio( window.devicePixelRatio );
   renderer.setSize( window.innerWidth, window.innerHeight );
   container.appendChild( renderer.domElement );
+  renderer.shadowMapEnabled = true;
+  renderer.shadowMapType = THREE.PCFShadowMap;
   controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.minDistance = 10;
   controls.maxDistance = 80;
