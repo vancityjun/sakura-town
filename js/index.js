@@ -111,8 +111,9 @@ function init() {
     // objloader.setPath('models/');
 
     objloader.load( 'models/sakura-park.obj', function ( obj ) {
+      object = obj;
       obj.castShadow = true;
-      obj.traverse(function(child){
+/*      obj.traverse(function(child){
         child.castShadow = true;
         if(child instanceof THREE.Mesh) {
           // child.material.map = texture;
@@ -120,7 +121,7 @@ function init() {
           child.receiveShadow = true;
         }
       })
-      // control.attach( obj );
+*/      // control.attach( obj );
       // scene.add( control );
     }, onProgress, onError );
   });
