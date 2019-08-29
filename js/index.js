@@ -115,6 +115,7 @@ function init() {
       obj.castShadow = true;
       obj.traverse(function(child){
         child.castShadow = true;
+        child.receiveShadow = true;
       })
       // control.attach( obj );
       // scene.add( control );
