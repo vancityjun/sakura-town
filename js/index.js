@@ -129,7 +129,7 @@ function init() {
   renderer.setSize( window.innerWidth, window.innerHeight );
   container.appendChild( renderer.domElement );
   renderer.shadowMapEnabled = true;
-  renderer.shadowMapType = THREE.PCFShadowMap;
+  renderer.shadowMapType = THREE.PCFSoftShadowMap;
   controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.minDistance = 10;
   controls.maxDistance = 80;
