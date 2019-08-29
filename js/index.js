@@ -112,7 +112,7 @@ function init() {
 
     objloader.load( 'models/sakura-park.obj', function ( obj ) {
       object = obj;
-      obj.castShadow = true;
+      // obj.castShadow = true;
 /*      obj.traverse(function(child){
         child.castShadow = true;
         if(child instanceof THREE.Mesh) {
