@@ -53,28 +53,41 @@ function init() {
   // camera.add( pointLight );
   scene.add( camera );
 
-  // manager
-  function loadModel() {
-    // object.traverse( function ( child ) {
-    //   if ( child.isMesh ) child.material.map = texture;
-    // } );
-    // object.position.y = - 30;
-    scene.add( object );
-    hideLoading();
-
-    // var el = document.getElementById("element-id");
-    // el.addEventListener("click", addObj, false);
-    // function addObj(){
-    //   var geometry =
-    // }
-  }
+  var GLB_MODEL_URL = 'models/sakura-park.glb';
+  var OBJ_MODEL_URL = 'models/sakura-park.obj';
+  var MTL_MODEL_URL = 'models/sakura-park.mtl';
 
   var loading = document.getElementsByClassName('loading')[0];
   var progressBar = document.getElementsByClassName('progressBar')[0];
+  var loadingTitle = loading ? loading.querySelector('.loading-title') : null;
+  var loadingError = loading ? loading.querySelector('.loading-error') : null;
 
   // progress.appendChild(progressBar);
 
   // document.body.appendChild(progress);
+  function setLoadingMessage( message ) {
+    if (loadingTitle) {
+      loadingTitle.textContent = message;
+    }
+  }
+
+  function clearError() {
+    if (!loadingError) {
+      return;
+    }
+    loadingError.textContent = '';
+    loadingError.classList.remove('is-visible');
+  }
+
+  function showError( message ) {
+    setLoadingMessage( 'Failed to load' );
+    if (!loadingError) {
+      return;
+    }
+    loadingError.textContent = message;
+    loadingError.classList.add('is-visible');
+  }
+
   function hideLoading() {
     if (!loading || loading.classList.contains('is-hidden')) {
       return;
@@ -86,6 +99,7 @@ function init() {
       }
     }, 700);
   }
+
   function showFileWarning() {
     if (!loading) {
       return;
@@ -95,9 +109,20 @@ function init() {
     warning.textContent = 'Model loading is blocked on file://. Run a local server (python3 -m http.server) and open http://localhost:8000/index.html';
     loading.appendChild(warning);
   }
+
   function hideProgress() {
     if (progressBar && progressBar.parentNode) {
       progressBar.parentNode.style.display = 'none';
+    }
+  }
+
+  function resetProgress() {
+    if (!progressBar) {
+      return;
+    }
+    progressBar.style.width = '0%';
+    if (progressBar.parentNode && window.location.protocol !== 'file:') {
+      progressBar.parentNode.style.display = 'block';
     }
   }
 
@@ -105,12 +130,6 @@ function init() {
     showFileWarning();
     hideProgress();
   }
-
-  var manager = new THREE.LoadingManager( loadModel );
-  manager.onProgress = function ( item, loaded, total ) {
-    console.log( item, loaded, total );
-    // progressBar.style.width = (loaded / total * 100) + '%';
-  };
   // texture
   // var textureLoader = new THREE.TextureLoader( manager );
   // var texture = new textureLoader.load( 'images/shiba-face-02.png' );
@@ -126,44 +145,103 @@ function init() {
   }
 );*/
   // model
-  function onProgress( xhr ) {
-    if ( xhr.lengthComputable ) {
-      var percentComplete = xhr.loaded / xhr.total * 100;
-      console.log( 'model ' + Math.round( percentComplete, 2 ) + '% downloaded' );
-      progressBar.style.width = Math.round( percentComplete, 2 ) + '%';
-
-      if (percentComplete >= 100) {
-        hideLoading();
+  function registerPickables( root ) {
+    pickables.length = 0;
+    hovered = null;
+    selected = null;
+    if (!root) {
+      return;
+    }
+    root.traverse(function(child){
+      if (child.isMesh) {
+        pickables.push(child);
+        child.castShadow = true;
+        child.receiveShadow = true;
       }
+    });
+  }
+
+  function addModelToScene( root ) {
+    if (!root) {
+      showError( getLoadErrorMessage() );
+      return;
+    }
+    object = root;
+    scene.add( object );
+    registerPickables( object );
+    hideLoading();
+  }
+
+  function getLoadErrorMessage() {
+    if (window.location.protocol === 'file:') {
+      return 'Failed to load model on file://. Run a local server (python3 -m http.server).';
+    }
+    return 'Failed to load model. Check the console for details.';
+  }
+
+  function setProgress( percent ) {
+    if (!progressBar) {
+      return;
+    }
+    var clamped = Math.max( 0, Math.min( 100, percent ) );
+    progressBar.style.width = Math.round( clamped ) + '%';
+  }
+
+  function onProgress( xhr ) {
+    if ( xhr && xhr.lengthComputable ) {
+      var percentComplete = xhr.loaded / xhr.total * 100;
+      console.log( 'model ' + Math.round( percentComplete ) + '% downloaded' );
+      setProgress( percentComplete );
     }
   }
 
-  function onError( xhr ) {}
+  function onFinalError( error ) {
+    console.error( 'Model load failed', error );
+    showError( getLoadErrorMessage() );
+  }
 
-  var mtlLoader = new THREE.MTLLoader();
-  // mtlLoader.setBaseUrl('models/');
-  mtlLoader.load('models/sakura-park.mtl', function(materials){
-    materials.preload();
+  function loadObjModel( isFallback ) {
+    setLoadingMessage( isFallback ? 'Loading OBJ fallback...' : 'Loading OBJ...' );
+    clearError();
+    resetProgress();
 
-    var objloader = new THREE.OBJLoader( manager );
-    objloader.setMaterials(materials);
-    // objloader.setPath('models/');
+    var mtlLoader = new THREE.MTLLoader();
+    mtlLoader.load( MTL_MODEL_URL, function(materials){
+      materials.preload();
 
-    objloader.load( 'models/sakura-park.obj', function ( obj ) {
-      object = obj;
-      obj.castShadow = true;
-      obj.traverse(function(child){
-        if (child.isMesh) {
-          pickables.push(child);
-          child.castShadow = true;
-          child.receiveShadow = true;
-        }
-      })
-      // control.attach( obj );
-      // scene.add( control );
-    }, onProgress, onError );
-  });
-  var loader = new THREE.JSONLoader();
+      var objloader = new THREE.OBJLoader();
+      objloader.setMaterials(materials);
+      // objloader.setPath('models/');
+
+      objloader.load( OBJ_MODEL_URL, function ( obj ) {
+        obj.castShadow = true;
+        addModelToScene( obj );
+        // control.attach( obj );
+        // scene.add( control );
+      }, onProgress, onFinalError );
+    }, undefined, onFinalError );
+  }
+
+  function loadGltfModel() {
+    if (!THREE.GLTFLoader) {
+      loadObjModel( true );
+      return;
+    }
+    setLoadingMessage( 'Loading GLB...' );
+    clearError();
+    resetProgress();
+
+    var gltfLoader = new THREE.GLTFLoader();
+    gltfLoader.load( GLB_MODEL_URL, function ( gltf ) {
+      var root = gltf.scene || (gltf.scenes && gltf.scenes[0]);
+      addModelToScene( root );
+    }, onProgress, function ( error ) {
+      console.warn( 'GLB load failed, falling back to OBJ.', error );
+      loadObjModel( true );
+    });
+  }
+
+  loadGltfModel();
 
   //
   renderer = new THREE.WebGLRenderer();
