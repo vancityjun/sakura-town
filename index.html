@@ -17,6 +17,29 @@
     </div>
     <!-- <p style="color:#fff;">사용자의 컴퓨터 사양에 따라 시간이 다소 소요될 수 있습니다.</p> -->
   </div>
+  <div id="ui">
+    <div id="toolbar">
+      <span id="selection-status">No selection</span>
+    </div>
+    <div id="pin-layer"></div>
+    <aside id="comment-panel" aria-live="polite">
+      <h3>Comments</h3>
+      <div class="comment-form">
+        <label class="comment-label" for="comment-input">New comment</label>
+        <textarea id="comment-input" rows="3" placeholder="Add a comment for this selection..."></textarea>
+        <div class="comment-actions">
+          <button id="add-comment" type="button">Add comment</button>
+          <button id="comment-clear" type="button" class="comment-secondary">Clear</button>
+        </div>
+      </div>
+      <div id="comment-empty">No comments yet.</div>
+      <ul id="comment-list"></ul>
+      <div class="comment-detail">
+        <h4>Selected</h4>
+        <p id="comment-text">Select a pin to see details.</p>
+      </div>
+    </aside>
+  </div>
   <script type="text/javascript" src="js/three.js"></script>
   <script type="text/javascript" src="js/WebGL.js"></script>
   <script type="text/javascript" src="js/Detector.js"></script>
@@ -43,6 +66,6 @@
   <script src="../editor/js/Menubar.Status.js"></script>
  -->
 
-  <script type="text/javascript" src="js/index.js"></script>
+  <script type="text/javascript" src="js/index.js?v=2"></script>
 </body>
 </html>

@@ -8,9 +8,14 @@ var raycaster, pointer;
 var pickables = [];
 var hovered = null;
 var selected = null;
+var selectedPoint = null;
 var hasPointer = false;
 var HOVER_COLOR = 0x3399ff;
 var SELECT_COLOR = 0xffaa00;
+var annotations = [];
+var activeAnnotationId = null;
+var annotationCounter = 0;
+var pinLayer, commentList, commentEmpty, commentText, commentInput, commentClearBtn, addCommentBtn, selectionStatus;
 init();
 animate();
 function init() {
@@ -148,7 +153,12 @@ function init() {
   function registerPickables( root ) {
     pickables.length = 0;
     hovered = null;
+    if (selected) {
+      clearHighlight( selected );
+    }
     selected = null;
+    selectedPoint = null;
+    updateSelectionUI();
     if (!root) {
       return;
     }
@@ -262,6 +272,7 @@ function init() {
   controls.update();
   controls.addEventListener('change', render);
   controls.addEventListener('change', updateHover);
+  initAnnotationUI();
   // coltrols transform
   /*
   control = new THREE.TransformControls( camera, renderer.domElement );
@@ -338,6 +349,7 @@ function onDocumentClick( event ) {
   raycaster.setFromCamera( pointer, camera );
   var intersects = raycaster.intersectObjects( pickables, false );
   var nextSelected = intersects.length ? intersects[0].object : null;
+  selectedPoint = intersects.length ? intersects[0].point.clone() : null;
 
   if (selected && selected !== nextSelected) {
     clearHighlight( selected );
@@ -346,6 +358,7 @@ function onDocumentClick( event ) {
   if (selected) {
     applyHighlight( selected, 'select' );
   }
+  updateSelectionUI();
   updateHover();
 }
 
@@ -372,8 +385,205 @@ function render() {
   // camera.position.x += ( mouseX - camera.position.x ) * .05;
   // camera.position.y += ( - mouseY - camera.position.y ) * .05;
   camera.lookAt( scene.position );
+  updateAnnotationPins();
   renderer.render( scene, camera );
 };
+
+function initAnnotationUI() {
+  pinLayer = document.getElementById('pin-layer');
+  commentList = document.getElementById('comment-list');
+  commentEmpty = document.getElementById('comment-empty');
+  commentText = document.getElementById('comment-text');
+  commentInput = document.getElementById('comment-input');
+  commentClearBtn = document.getElementById('comment-clear');
+  addCommentBtn = document.getElementById('add-comment');
+  selectionStatus = document.getElementById('selection-status');
+
+  if (addCommentBtn) {
+    addCommentBtn.addEventListener('click', onAddCommentClick, false);
+  }
+  if (commentInput) {
+    commentInput.addEventListener('input', updateAddCommentState, false);
+    commentInput.addEventListener('keydown', onCommentKeydown, false);
+  }
+  if (commentClearBtn) {
+    commentClearBtn.addEventListener('click', onCommentClearClick, false);
+  }
+  updateSelectionUI();
+  updateCommentPanel();
+}
+
+function updateSelectionUI() {
+  if (!selectionStatus) {
+    return;
+  }
+  if (selected) {
+    var label = selected.name;
+    if (!label && selected.parent && selected.parent.name) {
+      label = selected.parent.name;
+    }
+    selectionStatus.textContent = 'Selected: ' + (label || 'Mesh');
+  } else {
+    selectionStatus.textContent = 'No selection';
+  }
+  if (commentInput) {
+    commentInput.disabled = !selected;
+  }
+  updateAddCommentState();
+}
+
+function onAddCommentClick() {
+  if (!selected) {
+    setCommentDetail('Select a mesh before adding a comment.');
+    return;
+  }
+  if (!commentInput) {
+    return;
+  }
+  var comment = commentInput.value.trim();
+  if (!comment) {
+    setCommentDetail('Enter a comment before adding a pin.');
+    commentInput.focus();
+    updateAddCommentState();
+    return;
+  }
+  var position = selectedPoint ? selectedPoint.clone() : selected.getWorldPosition(new THREE.Vector3());
+  var annotation = {
+    id: annotationCounter++,
+    position: position,
+    comment: comment,
+    pinEl: null,
+    listEl: null
+  };
+  annotations.push( annotation );
+  createPin( annotation );
+  createListItem( annotation );
+  selectAnnotation( annotation.id );
+  updateCommentPanel();
+  commentInput.value = '';
+  updateAddCommentState();
+}
+
+function updateAddCommentState() {
+  if (!addCommentBtn) {
+    return;
+  }
+  var hasText = commentInput ? commentInput.value.trim().length > 0 : false;
+  addCommentBtn.disabled = !selected || !hasText;
+}
+
+function onCommentKeydown( event ) {
+  if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+    onAddCommentClick();
+  }
+}
+
+function onCommentClearClick() {
+  if (commentInput) {
+    commentInput.value = '';
+    commentInput.focus();
+  }
+  updateAddCommentState();
+}
+
+function createPin( annotation ) {
+  if (!pinLayer) {
+    return;
+  }
+  var pin = document.createElement('button');
+  pin.type = 'button';
+  pin.className = 'pin';
+  pin.setAttribute('aria-label', 'Comment pin');
+  pin.addEventListener('click', function(event){
+    event.stopPropagation();
+    selectAnnotation( annotation.id );
+  }, false);
+  pinLayer.appendChild( pin );
+  annotation.pinEl = pin;
+}
+
+function createListItem( annotation ) {
+  if (!commentList) {
+    return;
+  }
+  var item = document.createElement('li');
+  item.className = 'comment-item';
+  item.textContent = annotation.comment;
+  item.addEventListener('click', function(){
+    selectAnnotation( annotation.id );
+  }, false);
+  commentList.appendChild( item );
+  annotation.listEl = item;
+}
+
+function selectAnnotation( id ) {
+  var active = null;
+  for (var i = 0; i < annotations.length; i++) {
+    if (annotations[i].id === id) {
+      active = annotations[i];
+      break;
+    }
+  }
+  activeAnnotationId = active ? active.id : null;
+  if (commentText) {
+    commentText.textContent = active ? active.comment : 'Select a pin to see details.';
+  }
+  for (var j = 0; j < annotations.length; j++) {
+    var annotation = annotations[j];
+    var isActive = annotation.id === activeAnnotationId;
+    if (annotation.pinEl) {
+      annotation.pinEl.classList.toggle('is-active', isActive);
+    }
+    if (annotation.listEl) {
+      annotation.listEl.classList.toggle('is-active', isActive);
+    }
+  }
+}
+
+function setCommentDetail( message ) {
+  if (commentText) {
+    commentText.textContent = message;
+  }
+}
+
+function updateCommentPanel() {
+  if (!commentEmpty) {
+    return;
+  }
+  if (annotations.length === 0) {
+    commentEmpty.style.display = 'block';
+  } else {
+    commentEmpty.style.display = 'none';
+  }
+}
+
+function updateAnnotationPins() {
+  if (!pinLayer || annotations.length === 0 || !renderer || !camera) {
+    return;
+  }
+  var rect = renderer.domElement.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) {
+    return;
+  }
+  var projected = new THREE.Vector3();
+  for (var i = 0; i < annotations.length; i++) {
+    var annotation = annotations[i];
+    if (!annotation.pinEl) {
+      continue;
+    }
+    projected.copy( annotation.position ).project( camera );
+    var inView = projected.z >= -1 && projected.z <= 1 && Math.abs( projected.x ) <= 1 && Math.abs( projected.y ) <= 1;
+    if (!inView) {
+      annotation.pinEl.style.display = 'none';
+      continue;
+    }
+    var x = ( projected.x * 0.5 + 0.5 ) * rect.width + rect.left;
+    var y = ( - projected.y * 0.5 + 0.5 ) * rect.height + rect.top;
+    var scale = annotation.id === activeAnnotationId ? 1.15 : 1;
+    annotation.pinEl.style.display = 'block';
+    annotation.pinEl.style.transform = 'translate(-50%, -50%) translate(' + x + 'px,' + y + 'px) scale(' + scale + ')';
+  }
+}
 
 function updateHover() {
   if (!hasPointer || !raycaster || !pointer || pickables.length === 0) {
