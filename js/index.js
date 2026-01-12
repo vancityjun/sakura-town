@@ -18,6 +18,8 @@ var undoStack = [];
 var redoStack = [];
 var MAX_HISTORY = 50;
 var interactionEnabled = true;
+var needsRender = true;
+var stats;
 var annotations = [];
 var activeAnnotationId = null;
 var annotationCounter = 0;
@@ -263,6 +265,7 @@ function init() {
   container.appendChild( renderer.domElement );
   renderer.shadowMapEnabled = true;
   renderer.shadowMapType = THREE.PCFSoftShadowMap;
+  initStats();
   controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.minDistance = 10;
   controls.maxDistance = 80;
@@ -273,8 +276,7 @@ function init() {
   renderer.domElement.addEventListener( 'mouseleave', onPointerLeave, false );
   //
   controls.update();
-  controls.addEventListener('change', render);
-  controls.addEventListener('change', updateHover);
+  controls.addEventListener('change', onControlsChange);
   window.addEventListener( 'resize', onWindowResize, false );
   initTransformControls();
   initAnnotationUI();
@@ -287,6 +289,7 @@ function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize( window.innerWidth, window.innerHeight );
+  requestRender();
 }
 function onDocumentMouseMove( event ) {
   if (!interactionEnabled) {
@@ -295,7 +298,9 @@ function onDocumentMouseMove( event ) {
   mouseX = ( event.clientX - windowHalfX ) / 2;
   mouseY = ( event.clientY - windowHalfY ) / 2;
   updatePointerFromEvent( event );
-  updateHover();
+  if (updateHover()) {
+    requestRender();
+  }
 }
 
 function onDocumentClick( event ) {
@@ -312,6 +317,7 @@ function onDocumentClick( event ) {
   var nextPoint = intersects.length ? intersects[0].point.clone() : null;
   setSelectedObject( nextSelected, nextPoint );
   updateHover();
+  requestRender();
 }
 
 function onPointerLeave() {
@@ -320,6 +326,7 @@ function onPointerLeave() {
     clearHighlight( hovered );
   }
   hovered = null;
+  requestRender();
 }
 
 function updatePointerFromEvent( event ) {
@@ -331,15 +338,49 @@ function updatePointerFromEvent( event ) {
 //
 function animate() {
   requestAnimationFrame( animate );
-  render();
+  if (needsRender) {
+    render();
+    needsRender = false;
+  }
 }
 function render() {
   // camera.position.x += ( mouseX - camera.position.x ) * .05;
   // camera.position.y += ( - mouseY - camera.position.y ) * .05;
   camera.lookAt( scene.position );
+  if (stats) {
+    stats.begin();
+  }
   updateAnnotationPins();
   renderer.render( scene, camera );
+  if (stats) {
+    stats.end();
+  }
 };
+
+function requestRender() {
+  needsRender = true;
+}
+
+function initStats() {
+  if (typeof Stats === 'undefined') {
+    return;
+  }
+  stats = new Stats();
+  stats.showPanel(0);
+  stats.dom.style.position = 'fixed';
+  stats.dom.style.left = 'auto';
+  stats.dom.style.right = '12px';
+  stats.dom.style.top = 'auto';
+  stats.dom.style.bottom = '12px';
+  stats.dom.style.zIndex = '6';
+  stats.dom.style.pointerEvents = 'none';
+  document.body.appendChild( stats.dom );
+}
+
+function onControlsChange() {
+  updateHover();
+  requestRender();
+}
 
 function initInteractionToggle() {
   toggleInteractionBtn = document.getElementById('toggle-interaction');
@@ -362,6 +403,7 @@ function setInteractionEnabled( enabled ) {
     setSelectedObject( null );
   }
   updateInteractionUI();
+  requestRender();
 }
 
 function updateInteractionUI() {
@@ -378,7 +420,7 @@ function initTransformControls() {
   }
   control = new THREE.TransformControls( camera, renderer.domElement );
   control.setMode( transformMode );
-  control.addEventListener( 'change', render );
+  control.addEventListener( 'change', requestRender );
   control.addEventListener( 'dragging-changed', function( event ){
     controls.enabled = ! event.value;
   });
@@ -465,6 +507,7 @@ function updateTransformSelection() {
     control.visible = false;
   }
   updateTransformUI();
+  requestRender();
 }
 
 function onTransformStart() {
@@ -503,7 +546,7 @@ function undoTransform() {
   redoStack.push( action );
   setSelectedObject( action.object );
   updateTransformUI();
-  render();
+  requestRender();
 }
 
 function redoTransform() {
@@ -515,7 +558,7 @@ function redoTransform() {
   undoStack.push( action );
   setSelectedObject( action.object );
   updateTransformUI();
-  render();
+  requestRender();
 }
 
 function onTransformKeydown( event ) {
@@ -617,6 +660,7 @@ function setSelectedObject( target, point ) {
     applyHighlight( selected, 'select' );
   }
   updateSelectionUI();
+  requestRender();
 }
 
 function initAnnotationUI() {
@@ -819,14 +863,14 @@ function updateAnnotationPins() {
 
 function updateHover() {
   if (!interactionEnabled || !hasPointer || !raycaster || !pointer || pickables.length === 0) {
-    return;
+    return false;
   }
   raycaster.setFromCamera( pointer, camera );
   var intersects = raycaster.intersectObjects( pickables, false );
   var nextHovered = intersects.length ? intersects[0].object : null;
 
   if (nextHovered === hovered) {
-    return;
+    return false;
   }
   if (hovered && hovered !== selected) {
     clearHighlight( hovered );
@@ -835,6 +879,7 @@ function updateHover() {
   if (hovered && hovered !== selected) {
     applyHighlight( hovered, 'hover' );
   }
+  return true;
 }
 
 function getMaterials( mesh ) {
