@@ -17,7 +17,7 @@ var transformStartState = null;
 var undoStack = [];
 var redoStack = [];
 var MAX_HISTORY = 50;
-var interactionEnabled = true;
+var interactionEnabled = false;
 var needsRender = true;
 var stats;
 var annotations = [];
@@ -402,6 +402,7 @@ function setInteractionEnabled( enabled ) {
     hovered = null;
     setSelectedObject( null );
   }
+  updateSelectionUI();
   updateInteractionUI();
   requestRender();
 }
