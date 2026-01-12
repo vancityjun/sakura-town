@@ -2,6 +2,10 @@
 
 WebGL 
 
+## Highlights
+
+- Implemented object picking and hover/selection highlighting in a Three.js WebGL viewer using Raycaster.
+
 ## Getting Started
 
 

@@ -4,6 +4,13 @@ var mouseX = 0, mouseY = 0;
 var windowHalfX = window.innerWidth / 2;
 var windowHalfY = window.innerHeight / 2;
 var object;
+var raycaster, pointer;
+var pickables = [];
+var hovered = null;
+var selected = null;
+var hasPointer = false;
+var HOVER_COLOR = 0x3399ff;
+var SELECT_COLOR = 0xffaa00;
 init();
 animate();
 function init() {
@@ -18,6 +25,8 @@ function init() {
   scene.background = new THREE.Color( 0xaaddff );
   scene.fog = new THREE.Fog(0xaaddff, 70, 100);
   renderer = new THREE.WebGLRenderer( { antialias: true } );
+  raycaster = new THREE.Raycaster();
+  pointer = new THREE.Vector2();
   // scene.add(new THREE.GridHelper(200, 20));
 
   dirLight = new THREE.DirectionalLight( 0xffffff, 1 );
@@ -51,6 +60,7 @@ function init() {
     // } );
     // object.position.y = - 30;
     scene.add( object );
+    hideLoading();
 
     // var el = document.getElementById("element-id");
     // el.addEventListener("click", addObj, false);
@@ -59,12 +69,42 @@ function init() {
     // }
   }
 
-  var loading = document.getElementsByClassName('loading');
+  var loading = document.getElementsByClassName('loading')[0];
   var progressBar = document.getElementsByClassName('progressBar')[0];
 
   // progress.appendChild(progressBar);
 
   // document.body.appendChild(progress);
+  function hideLoading() {
+    if (!loading || loading.classList.contains('is-hidden')) {
+      return;
+    }
+    loading.classList.add('is-hidden');
+    window.setTimeout(function(){
+      if (loading && loading.parentNode) {
+        loading.parentNode.removeChild(loading);
+      }
+    }, 700);
+  }
+  function showFileWarning() {
+    if (!loading) {
+      return;
+    }
+    var warning = document.createElement('p');
+    warning.className = 'loading-warning';
+    warning.textContent = 'Model loading is blocked on file://. Run a local server (python3 -m http.server) and open http://localhost:8000/index.html';
+    loading.appendChild(warning);
+  }
+  function hideProgress() {
+    if (progressBar && progressBar.parentNode) {
+      progressBar.parentNode.style.display = 'none';
+    }
+  }
+
+  if (window.location.protocol === 'file:') {
+    showFileWarning();
+    hideProgress();
+  }
 
   var manager = new THREE.LoadingManager( loadModel );
   manager.onProgress = function ( item, loaded, total ) {
@@ -92,9 +132,8 @@ function init() {
       console.log( 'model ' + Math.round( percentComplete, 2 ) + '% downloaded' );
       progressBar.style.width = Math.round( percentComplete, 2 ) + '%';
 
-      if (progressBar.style.width == '100%'){
-        // loading.style.display = 'none';
-        $('.loading').fadeOut(600);
+      if (percentComplete >= 100) {
+        hideLoading();
       }
     }
   }
@@ -114,8 +153,11 @@ function init() {
       object = obj;
       obj.castShadow = true;
       obj.traverse(function(child){
-        child.castShadow = true;
-        child.receiveShadow = true;
+        if (child.isMesh) {
+          pickables.push(child);
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
       })
       // control.attach( obj );
       // scene.add( control );
@@ -135,10 +177,13 @@ function init() {
   controls.maxDistance = 80;
   controls.maxPolarAngle = Math.PI / 2;
 
-  document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+  renderer.domElement.addEventListener( 'mousemove', onDocumentMouseMove, false );
+  renderer.domElement.addEventListener( 'click', onDocumentClick, false );
+  renderer.domElement.addEventListener( 'mouseleave', onPointerLeave, false );
   //
   controls.update();
   controls.addEventListener('change', render);
+  controls.addEventListener('change', updateHover);
   // coltrols transform
   /*
   control = new THREE.TransformControls( camera, renderer.domElement );
@@ -203,6 +248,42 @@ function onWindowResize() {
 function onDocumentMouseMove( event ) {
   mouseX = ( event.clientX - windowHalfX ) / 2;
   mouseY = ( event.clientY - windowHalfY ) / 2;
+  updatePointerFromEvent( event );
+  updateHover();
+}
+
+function onDocumentClick( event ) {
+  updatePointerFromEvent( event );
+  if (!raycaster || pickables.length === 0) {
+    return;
+  }
+  raycaster.setFromCamera( pointer, camera );
+  var intersects = raycaster.intersectObjects( pickables, false );
+  var nextSelected = intersects.length ? intersects[0].object : null;
+
+  if (selected && selected !== nextSelected) {
+    clearHighlight( selected );
+  }
+  selected = nextSelected;
+  if (selected) {
+    applyHighlight( selected, 'select' );
+  }
+  updateHover();
+}
+
+function onPointerLeave() {
+  hasPointer = false;
+  if (hovered && hovered !== selected) {
+    clearHighlight( hovered );
+  }
+  hovered = null;
+}
+
+function updatePointerFromEvent( event ) {
+  var rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ( ( event.clientX - rect.left ) / rect.width ) * 2 - 1;
+  pointer.y = - ( ( event.clientY - rect.top ) / rect.height ) * 2 + 1;
+  hasPointer = true;
 }
 //
 function animate() {
@@ -215,3 +296,93 @@ function render() {
   camera.lookAt( scene.position );
   renderer.render( scene, camera );
 };
+
+function updateHover() {
+  if (!hasPointer || !raycaster || !pointer || pickables.length === 0) {
+    return;
+  }
+  raycaster.setFromCamera( pointer, camera );
+  var intersects = raycaster.intersectObjects( pickables, false );
+  var nextHovered = intersects.length ? intersects[0].object : null;
+
+  if (nextHovered === hovered) {
+    return;
+  }
+  if (hovered && hovered !== selected) {
+    clearHighlight( hovered );
+  }
+  hovered = nextHovered;
+  if (hovered && hovered !== selected) {
+    applyHighlight( hovered, 'hover' );
+  }
+}
+
+function getMaterials( mesh ) {
+  if (!mesh || !mesh.material) {
+    return [];
+  }
+  return Array.isArray( mesh.material ) ? mesh.material : [ mesh.material ];
+}
+
+function cloneMaterial( material ) {
+  if (Array.isArray( material )) {
+    return material.map(function(mat){
+      return mat.clone();
+    });
+  }
+  return material.clone();
+}
+
+function ensureUniqueMaterial( mesh ) {
+  if (mesh.userData._uniqueMaterial) {
+    return;
+  }
+  if (mesh.material) {
+    mesh.material = cloneMaterial( mesh.material );
+    mesh.userData._uniqueMaterial = true;
+  }
+}
+
+function cacheOriginalMaterial( mesh ) {
+  if (mesh.userData._origMaterialState) {
+    return;
+  }
+  ensureUniqueMaterial( mesh );
+  var materials = getMaterials( mesh );
+  mesh.userData._origMaterialState = materials.map(function(mat){
+    return {
+      emissive: mat.emissive ? mat.emissive.getHex() : null,
+      color: mat.color ? mat.color.getHex() : null
+    };
+  });
+}
+
+function applyHighlight( mesh, mode ) {
+  var colorHex = mode === 'select' ? SELECT_COLOR : HOVER_COLOR;
+  cacheOriginalMaterial( mesh );
+  var materials = getMaterials( mesh );
+  materials.forEach(function(mat){
+    if (mat.emissive) {
+      mat.emissive.setHex( colorHex );
+    } else if (mat.color) {
+      mat.color.setHex( colorHex );
+    }
+  });
+}
+
+function clearHighlight( mesh ) {
+  var materials = getMaterials( mesh );
+  var state = mesh.userData._origMaterialState;
+  if (!state) {
+    return;
+  }
+  materials.forEach(function(mat, index){
+    var saved = state[index] || {};
+    if (mat.emissive && saved.emissive !== null) {
+      mat.emissive.setHex( saved.emissive );
+    }
+    if (mat.color && saved.color !== null) {
+      mat.color.setHex( saved.color );
+    }
+  });
+}
