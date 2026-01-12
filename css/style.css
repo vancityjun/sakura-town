@@ -1,6 +1,46 @@
 body{margin: 0; overflow: hidden;font-family: sans-serif;}
 canvas{width: 100%; height: 100vh;}
-.loading{position: fixed; top: 30%; left:50%; transform: translate(-50%, 50%); width: 300px;}
+.loading{position: fixed; top: 30%; left:50%; transform: translate(-50%, 50%); width: 300px; opacity: 1; transition: opacity 0.6s ease; text-align: center; z-index: 10;}
+.loading.is-hidden{opacity: 0; pointer-events: none;}
+.loading-warning{color: #fff; font-size: 12px; margin-top: 10px; line-height: 1.4;}
+.spinner{width: 32px; height: 32px; margin: 0 auto 10px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.3); border-top-color: #fff; animation: spin 0.9s linear infinite;}
+.loading-title{color: #fff; margin: 0 0 8px; letter-spacing: 0.5px;}
+.loading-error{color: #ffd4d4; font-size: 12px; margin: 8px 0 0; line-height: 1.4; display: none;}
+.loading-error.is-visible{display: block;}
 .progress{ width: 100%; height: 10px; border: 1px solid #fff;}
 .progressBar{background: #fff; height: 100%;}
-.loading h3{color: #fff;}
+
+@keyframes spin{
+  to{transform: rotate(360deg);}
+}
+
+#ui{position: fixed; inset: 0; pointer-events: none; z-index: 5;}
+#toolbar{position: fixed; top: 16px; left: 16px; display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.55); color: #fff; padding: 8px 10px; border-radius: 8px; font-size: 12px; pointer-events: auto;}
+#toolbar .toolbar-group{display: flex; gap: 6px; align-items: center;}
+.toolbar-button{background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer;}
+.toolbar-button.is-active{background: #ffd166; color: #1d1b1b; border-color: #ffd166;}
+.toolbar-button:disabled{opacity: 0.45; cursor: not-allowed;}
+#toggle-interaction{min-width: 110px;}
+#add-comment{background: #ff4d6d; color: #fff; border: none; border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer;}
+#add-comment:disabled{opacity: 0.5; cursor: not-allowed;}
+#selection-status{opacity: 0.8;}
+
+#pin-layer{position: absolute; inset: 0; pointer-events: none;}
+.pin{position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #ff4d6d; border: 2px solid #fff; box-shadow: 0 0 10px rgba(255,77,109,0.7); pointer-events: auto; cursor: pointer;}
+.pin.is-active{background: #ffd166; box-shadow: 0 0 12px rgba(255,209,102,0.9);}
+
+#comment-panel{position: fixed; top: 16px; right: 16px; width: 240px; max-height: calc(100% - 32px); background: rgba(0,0,0,0.55); color: #fff; padding: 12px; border-radius: 10px; pointer-events: auto; overflow: auto; font-size: 12px;}
+#comment-panel h3{margin: 0 0 8px; font-size: 14px;}
+#comment-panel h4{margin: 12px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; opacity: 0.8;}
+#comment-panel .comment-form{margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px;}
+.comment-label{font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; opacity: 0.7;}
+#comment-input{width: 100%; min-height: 60px; resize: vertical; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.3); color: #fff; padding: 6px 8px; font-size: 12px;}
+#comment-input:focus{outline: none; border-color: rgba(255,255,255,0.6);}
+#comment-input:disabled{opacity: 0.6; cursor: not-allowed;}
+.comment-actions{display: flex; gap: 6px; align-items: center;}
+.comment-secondary{background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.35); border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer;}
+#comment-empty{opacity: 0.7; margin: 8px 0;}
+#comment-list{list-style: none; padding: 0; margin: 0 0 8px;}
+.comment-item{padding: 6px 8px; border-radius: 6px; cursor: pointer; margin-bottom: 4px; background: rgba(255,255,255,0.06); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.comment-item.is-active{background: rgba(255,255,255,0.2);}
+.comment-detail p{margin: 0; line-height: 1.4;}
