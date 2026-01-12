@@ -12,10 +12,18 @@ var selectedPoint = null;
 var hasPointer = false;
 var HOVER_COLOR = 0x3399ff;
 var SELECT_COLOR = 0xffaa00;
+var transformMode = 'translate';
+var transformStartState = null;
+var undoStack = [];
+var redoStack = [];
+var MAX_HISTORY = 50;
+var interactionEnabled = true;
 var annotations = [];
 var activeAnnotationId = null;
 var annotationCounter = 0;
 var pinLayer, commentList, commentEmpty, commentText, commentInput, commentClearBtn, addCommentBtn, selectionStatus;
+var transformTranslateBtn, transformRotateBtn, transformUndoBtn, transformRedoBtn;
+var toggleInteractionBtn;
 init();
 animate();
 function init() {
@@ -153,12 +161,7 @@ function init() {
   function registerPickables( root ) {
     pickables.length = 0;
     hovered = null;
-    if (selected) {
-      clearHighlight( selected );
-    }
-    selected = null;
-    selectedPoint = null;
-    updateSelectionUI();
+    setSelectedObject( null );
     if (!root) {
       return;
     }
@@ -272,59 +275,10 @@ function init() {
   controls.update();
   controls.addEventListener('change', render);
   controls.addEventListener('change', updateHover);
-  initAnnotationUI();
-  // coltrols transform
-  /*
-  control = new THREE.TransformControls( camera, renderer.domElement );
-  control.addEventListener('change', render );
-  control.addEventListener( 'dragging-changed', function( event ){
-    controls.enabled = ! event.value;
-  });
   window.addEventListener( 'resize', onWindowResize, false );
-  window.addEventListener( 'keydown', function (event){
-    switch (event.keyCode ) {
-      case 81: // Q
-      control.setSpace( control.space === "local" ? "world" : "local");
-      break;
-
-      case 17: // ctrl
-      control.setTranslationSnap( 10 );
-      control.setRotationSnap( THREE.Math.degToRad(15));
-      break;
-
-      case 87: // w
-      control.setMode("translate");
-      break;
-      case 69: // e
-      control.setMode("rotate");
-      break;
-      case 82: // r
-      control.setMode("scale");
-      break;
-
-      case 187:
-      case 107: // +, =, num+
-      control.serSize(control.size + 0.1 );
-      break;
-      case 189:
-      case 109: // +, =, num+
-      control.serSize(control.size - 0.1, 0.1 );
-      break;
-
-      case 32: //spacebar
-      control.enabled = ! control.enabled;
-      break;
-    }
-  });
-  window.addEventListener('keyup', function (event){
-    switch ( event.keyCode ){
-      case 17: // control
-        control.setTranslationSnap(null);
-        control.setRotationSnap(null);
-        break;
-    }
-  });
-  */
+  initTransformControls();
+  initAnnotationUI();
+  initInteractionToggle();
 };
 
 function onWindowResize() {
@@ -335,6 +289,9 @@ function onWindowResize() {
   renderer.setSize( window.innerWidth, window.innerHeight );
 }
 function onDocumentMouseMove( event ) {
+  if (!interactionEnabled) {
+    return;
+  }
   mouseX = ( event.clientX - windowHalfX ) / 2;
   mouseY = ( event.clientY - windowHalfY ) / 2;
   updatePointerFromEvent( event );
@@ -342,6 +299,9 @@ function onDocumentMouseMove( event ) {
 }
 
 function onDocumentClick( event ) {
+  if (!interactionEnabled) {
+    return;
+  }
   updatePointerFromEvent( event );
   if (!raycaster || pickables.length === 0) {
     return;
@@ -349,16 +309,8 @@ function onDocumentClick( event ) {
   raycaster.setFromCamera( pointer, camera );
   var intersects = raycaster.intersectObjects( pickables, false );
   var nextSelected = intersects.length ? intersects[0].object : null;
-  selectedPoint = intersects.length ? intersects[0].point.clone() : null;
-
-  if (selected && selected !== nextSelected) {
-    clearHighlight( selected );
-  }
-  selected = nextSelected;
-  if (selected) {
-    applyHighlight( selected, 'select' );
-  }
-  updateSelectionUI();
+  var nextPoint = intersects.length ? intersects[0].point.clone() : null;
+  setSelectedObject( nextSelected, nextPoint );
   updateHover();
 }
 
@@ -389,6 +341,284 @@ function render() {
   renderer.render( scene, camera );
 };
 
+function initInteractionToggle() {
+  toggleInteractionBtn = document.getElementById('toggle-interaction');
+  if (!toggleInteractionBtn) {
+    return;
+  }
+  toggleInteractionBtn.addEventListener('click', function(){
+    setInteractionEnabled( !interactionEnabled );
+  }, false);
+  updateInteractionUI();
+}
+
+function setInteractionEnabled( enabled ) {
+  interactionEnabled = !!enabled;
+  if (!interactionEnabled) {
+    if (hovered) {
+      clearHighlight( hovered );
+    }
+    hovered = null;
+    setSelectedObject( null );
+  }
+  updateInteractionUI();
+}
+
+function updateInteractionUI() {
+  if (!toggleInteractionBtn) {
+    return;
+  }
+  toggleInteractionBtn.textContent = interactionEnabled ? 'Selection: On' : 'Selection: Off';
+  toggleInteractionBtn.classList.toggle('is-active', interactionEnabled);
+}
+
+function initTransformControls() {
+  if (!THREE.TransformControls) {
+    return;
+  }
+  control = new THREE.TransformControls( camera, renderer.domElement );
+  control.setMode( transformMode );
+  control.addEventListener( 'change', render );
+  control.addEventListener( 'dragging-changed', function( event ){
+    controls.enabled = ! event.value;
+  });
+  control.addEventListener( 'mouseDown', onTransformStart );
+  control.addEventListener( 'mouseUp', onTransformEnd );
+  control.visible = false;
+  scene.add( control );
+  initTransformUI();
+  window.addEventListener( 'keydown', onTransformKeydown, false );
+}
+
+function initTransformUI() {
+  transformTranslateBtn = document.getElementById('transform-translate');
+  transformRotateBtn = document.getElementById('transform-rotate');
+  transformUndoBtn = document.getElementById('transform-undo');
+  transformRedoBtn = document.getElementById('transform-redo');
+
+  if (transformTranslateBtn) {
+    transformTranslateBtn.addEventListener('click', function(){
+      setTransformMode('translate');
+    }, false);
+  }
+  if (transformRotateBtn) {
+    transformRotateBtn.addEventListener('click', function(){
+      setTransformMode('rotate');
+    }, false);
+  }
+  if (transformUndoBtn) {
+    transformUndoBtn.addEventListener('click', function(){
+      undoTransform();
+    }, false);
+  }
+  if (transformRedoBtn) {
+    transformRedoBtn.addEventListener('click', function(){
+      redoTransform();
+    }, false);
+  }
+  updateTransformUI();
+}
+
+function setTransformMode( mode ) {
+  transformMode = mode;
+  if (control) {
+    control.setMode( mode );
+  }
+  updateTransformUI();
+}
+
+function updateTransformUI() {
+  var canInteract = interactionEnabled;
+  var hasSelection = canInteract && !!selected;
+  if (transformTranslateBtn) {
+    transformTranslateBtn.disabled = !hasSelection;
+    transformTranslateBtn.classList.toggle('is-active', transformMode === 'translate');
+  }
+  if (transformRotateBtn) {
+    transformRotateBtn.disabled = !hasSelection;
+    transformRotateBtn.classList.toggle('is-active', transformMode === 'rotate');
+  }
+  if (transformUndoBtn) {
+    transformUndoBtn.disabled = !canInteract || undoStack.length === 0;
+  }
+  if (transformRedoBtn) {
+    transformRedoBtn.disabled = !canInteract || redoStack.length === 0;
+  }
+}
+
+function updateTransformSelection() {
+  if (!control) {
+    updateTransformUI();
+    return;
+  }
+  if (!interactionEnabled) {
+    control.detach();
+    control.visible = false;
+    updateTransformUI();
+    return;
+  }
+  if (selected) {
+    control.attach( selected );
+    control.visible = true;
+  } else {
+    control.detach();
+    control.visible = false;
+  }
+  updateTransformUI();
+}
+
+function onTransformStart() {
+  if (!control || !control.object) {
+    return;
+  }
+  transformStartState = getTransformState( control.object );
+}
+
+function onTransformEnd() {
+  if (!control || !control.object || !transformStartState) {
+    return;
+  }
+  var endState = getTransformState( control.object );
+  if (!transformStateEquals( transformStartState, endState )) {
+    undoStack.push({
+      object: control.object,
+      before: transformStartState,
+      after: endState
+    });
+    if (undoStack.length > MAX_HISTORY) {
+      undoStack.shift();
+    }
+    redoStack.length = 0;
+  }
+  transformStartState = null;
+  updateTransformUI();
+}
+
+function undoTransform() {
+  if (!interactionEnabled || undoStack.length === 0) {
+    return;
+  }
+  var action = undoStack.pop();
+  applyTransformState( action.object, action.before );
+  redoStack.push( action );
+  setSelectedObject( action.object );
+  updateTransformUI();
+  render();
+}
+
+function redoTransform() {
+  if (!interactionEnabled || redoStack.length === 0) {
+    return;
+  }
+  var action = redoStack.pop();
+  applyTransformState( action.object, action.after );
+  undoStack.push( action );
+  setSelectedObject( action.object );
+  updateTransformUI();
+  render();
+}
+
+function onTransformKeydown( event ) {
+  if (!interactionEnabled) {
+    return;
+  }
+  if (isEditableElement( event.target )) {
+    return;
+  }
+  var key = event.key.toLowerCase();
+  var isCmdOrCtrl = event.metaKey || event.ctrlKey;
+  if (isCmdOrCtrl && key === 'z') {
+    event.preventDefault();
+    if (event.shiftKey) {
+      redoTransform();
+    } else {
+      undoTransform();
+    }
+    return;
+  }
+  if (isCmdOrCtrl && key === 'y') {
+    event.preventDefault();
+    redoTransform();
+    return;
+  }
+  if (key === 'w') {
+    setTransformMode('translate');
+  }
+  if (key === 'e') {
+    setTransformMode('rotate');
+  }
+}
+
+function isEditableElement( element ) {
+  if (!element) {
+    return false;
+  }
+  var tag = element.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || element.isContentEditable;
+}
+
+function getTransformState( target ) {
+  return {
+    position: target.position.clone(),
+    quaternion: target.quaternion.clone(),
+    scale: target.scale.clone()
+  };
+}
+
+function applyTransformState( target, state ) {
+  target.position.copy( state.position );
+  target.quaternion.copy( state.quaternion );
+  target.scale.copy( state.scale );
+  target.updateMatrixWorld();
+}
+
+function transformStateEquals( first, second ) {
+  return first.position.equals( second.position ) &&
+    first.quaternion.equals( second.quaternion ) &&
+    first.scale.equals( second.scale );
+}
+
+function ensureCenteredPivot( mesh ) {
+  if (!mesh || !mesh.isMesh || !mesh.geometry || mesh.userData._pivotCentered) {
+    return;
+  }
+  var geometry = mesh.geometry;
+  if (geometry && geometry.computeBoundingBox) {
+    geometry.computeBoundingBox();
+  }
+  if (!geometry || !geometry.boundingBox) {
+    mesh.userData._pivotCentered = true;
+    return;
+  }
+  var center = new THREE.Vector3();
+  geometry.boundingBox.getCenter( center );
+  if (center.lengthSq() === 0) {
+    mesh.userData._pivotCentered = true;
+    return;
+  }
+  mesh.geometry = geometry.clone();
+  mesh.geometry.translate( -center.x, -center.y, -center.z );
+  var offset = center.clone();
+  offset.multiply( mesh.scale );
+  offset.applyQuaternion( mesh.quaternion );
+  mesh.position.add( offset );
+  mesh.updateMatrixWorld();
+  mesh.userData._pivotCentered = true;
+}
+
+function setSelectedObject( target, point ) {
+  if (selected && selected !== target) {
+    clearHighlight( selected );
+  }
+  selected = target || null;
+  selectedPoint = point ? point.clone() : null;
+  if (selected) {
+    ensureCenteredPivot( selected );
+    applyHighlight( selected, 'select' );
+  }
+  updateSelectionUI();
+}
+
 function initAnnotationUI() {
   pinLayer = document.getElementById('pin-layer');
   commentList = document.getElementById('comment-list');
@@ -414,22 +644,24 @@ function initAnnotationUI() {
 }
 
 function updateSelectionUI() {
-  if (!selectionStatus) {
-    return;
-  }
-  if (selected) {
-    var label = selected.name;
-    if (!label && selected.parent && selected.parent.name) {
-      label = selected.parent.name;
+  if (selectionStatus) {
+    if (!interactionEnabled) {
+      selectionStatus.textContent = 'Selection disabled';
+    } else if (selected) {
+      var label = selected.name;
+      if (!label && selected.parent && selected.parent.name) {
+        label = selected.parent.name;
+      }
+      selectionStatus.textContent = 'Selected: ' + (label || 'Mesh');
+    } else {
+      selectionStatus.textContent = 'No selection';
     }
-    selectionStatus.textContent = 'Selected: ' + (label || 'Mesh');
-  } else {
-    selectionStatus.textContent = 'No selection';
   }
   if (commentInput) {
     commentInput.disabled = !selected;
   }
   updateAddCommentState();
+  updateTransformSelection();
 }
 
 function onAddCommentClick() {
@@ -586,7 +818,7 @@ function updateAnnotationPins() {
 }
 
 function updateHover() {
-  if (!hasPointer || !raycaster || !pointer || pickables.length === 0) {
+  if (!interactionEnabled || !hasPointer || !raycaster || !pointer || pickables.length === 0) {
     return;
   }
   raycaster.setFromCamera( pointer, camera );

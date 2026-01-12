@@ -7,6 +7,7 @@ WebGL
 - Implemented object picking and hover/selection highlighting in a Three.js WebGL viewer using Raycaster.
 - Added GLTF/GLB loading support with a loading/error UI for 3D assets.
 - Built review annotations by anchoring comment pins to 3D world positions with screen-space overlays.
+- Enabled in-view 3D adjustments using TransformControls (translate/rotate) for selected objects.
 
 ## Getting Started
 
